@@ -1,7 +1,7 @@
 package main
 
 import (
-//    "flag"
+    "flag"
 	"fmt"
 	"strings"
 	"net/http"
@@ -9,6 +9,7 @@ import (
     "os"
     "github.com/gin-gonic/gin"
     "encoding/json"
+//    "strconv"
 )
 
 import "github.com/buger/jsonparser"
@@ -22,18 +23,18 @@ type listOfJson struct {
 var atoken string
 
 func main() {
-    //client_id := flag.String("id", "", "client id for Abios API")
-    //client_key := flag.String("key", "", "client key for Abios API")
-    //flag.Parse()
+    client_id := flag.String("id", "", "client id for Abios API")
+    client_key := flag.String("key", "", "client key for Abios API")
+    flag.Parse()
 
 	server := gin.Default()
 
-    /*var err error
+    var err error
     atoken, err = getAccessToken(*client_key, *client_id)
 
     if err != nil {
         fmt.Println("something is wrong")
-    }*/
+    }
 
     // set routes to specific methods
 	server.GET("/series/live", series)
@@ -48,28 +49,39 @@ func series(c *gin.Context) {
     //statusCode, jsonData := getBody(ABIOS_URL + "/series")
     _, liveSeries := getLiveSeries()
 
-    c.IndentedJSON(200, liveSeries)
+    var tj map[string]*interface{}
+    json.Unmarshal(liveSeries, &tj)
+
+    c.JSON(200, tj)
 }
 
 func players(c *gin.Context) {
     // download
     //statusCode, jsonData := getBody(ABIOS_URL + "/series")
+    var allPlayers []byte
     _, data := getLiveSeries()
 
     // iterate over teams and return
-    players := getNestedKeyFromArray(data, "rosters", "players")
+    jsonparser.ArrayEach(data, func(player []byte, dataType jsonparser.ValueType, offset int, err error) {
+        fmt.Println(string(player))
+        allPlayers = append(allPlayers, player...)
+    }, "rosters", "players")
 
-    c.IndentedJSON(200, players)
+    c.JSON(200, allPlayers)
 }
 
 func teams(c *gin.Context) {
     // download
+    var allTeams []byte
     _, data := getLiveSeries()
 
     // iterate over teams and return
-    teams := getNestedKeyFromArray(data, "rosters", "teams")
+    jsonparser.ArrayEach(data, func(team []byte, dataType jsonparser.ValueType, offset int, err error) {
+        fmt.Println(string(team))
+        allTeams = append(allTeams, team...)
+    }, "rosters", "teams")
 
-    c.IndentedJSON(200, teams)
+    c.JSON(200, allTeams)
 }
 
 func getAccessToken(clientToken string, clientId string) (string, error) {
@@ -109,53 +121,25 @@ func getBody(url string) (int, []byte) {
     return res.StatusCode, body
 }
 
-func getLiveSeries() (error, []map[string]interface{}) {
-    //var returnValue []byte
-    var jn map[string]interface{}
-    var returnValue []map[string]interface{}
+func getLiveSeries() (error, []byte) {
+    var returnValue []byte
     var err error
 
     //_, jsonData := getBody(ABIOS_URL + "/series")
 
     jsonData, err := ioutil.ReadFile("src/main/series.txt")
-    json.Unmarshal(jsonData, &jn)
 
     // iterate over data
-    series := getKeyAndReturnArray(jn, "data")
+    jsonparser.ArrayEach(jsonData, func(serie []byte, dataType jsonparser.ValueType, offset int, err error) {
+        valu, _, _,_ := jsonparser.Get(serie, "end")
 
-    for _, serie := range series {
-        if serie["end"] == nil {
-            returnValue = append(returnValue, serie)
+        // if end is null: still live
+        if string(valu) == "null" {
+            returnValue = append(returnValue, serie...)
         }
-    }
+    }, "data")
+
     return err, returnValue
-}
-
-func getKeyAndReturnArray(array map[string]interface{}, key string) ([]map[string]interface{}) {
-   var ret []map[string]interface{}
-
-    mid := array[key]
-    byt, _ := json.Marshal(mid)
-    json.Unmarshal(byt, &ret)
-    return ret
-}
-
-
-func getNestedKeyFromArray(array []map[string]interface{}, key1 string, key2 string) ([]map[string]interface{}) {
-
-    var returnValue []map[string]interface{}
-
-    for _, elem1 := range array {
-        key1Elem := getKeyAndReturnArray(elem1, key1)
-
-        for _, elem2 := range key1Elem {
-            key2Elem := getKeyAndReturnArray(elem2, key2)
-            returnValue = append(returnValue, key2Elem...)
-        }
-    }
-
-    return returnValue
-
 }
 
 /*func jsonPrettyPrint(in []byte) string {
