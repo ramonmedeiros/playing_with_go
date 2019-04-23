@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"io/ioutil"
     "os"
-    "github.com/gin-gonic/gin"
     "encoding/json"
     "log"
-    "github.com/aviddiviner/gin-limit"
+    "golang.org/x/time/rate"
 )
 
 const ABIOS_URL = "https://api.abiosgaming.com/v2"
 
 var atoken string
+var limiter = rate.NewLimiter(2, 5)
 
 func main() {
     // parse client_id and key
@@ -24,41 +24,40 @@ func main() {
     flag.Parse()
 
     // start and set rate limit
-	server := gin.Default()
-    server.Use(limit.MaxAllowed(2))
+    mux := http.NewServeMux()
+    mux.HandleFunc("/series/live", series)
+	mux.HandleFunc("/players/live", players)
+	mux.HandleFunc("/teams/live", teams)
+
 
     // store token and let it global
     atoken = getAccessToken(*client_key, *client_id)
     log.Println("ACCESS_TOKEN:", atoken)
 
     // routers
-	server.GET("/series/live", series)
-	server.GET("/players/live", players)
-	server.GET("/teams/live", teams)
-
-	server.Run()
+    http.ListenAndServe(":8080", limit(mux))
 }
 
-func series(c *gin.Context) {
+func series(w http.ResponseWriter, r *http.Request) {
     _, liveSeries := getLiveSeries()
 
-    c.IndentedJSON(200, liveSeries)
+    writeJson(w, liveSeries)
 }
 
-func players(c *gin.Context) {
+func players(w http.ResponseWriter, r *http.Request)  {
     _, data := getLiveSeries()
 
     players := getNestedKeyFromArray(data, "rosters", "players")
 
-    c.IndentedJSON(200, players)
+    writeJson(w, players)
 }
 
-func teams(c *gin.Context) {
+func teams(w http.ResponseWriter, r *http.Request)  {
     _, data := getLiveSeries()
 
     teams := getNestedKeyFromArray(data, "rosters", "teams")
 
-    c.IndentedJSON(200, teams)
+    writeJson(w, teams)
 }
 
 func getAccessToken(clientToken string, clientId string) (string) {
@@ -140,4 +139,23 @@ func getNestedKeyFromArray(array []map[string]interface{}, key1 string, key2 str
     }
 
     return returnValue
+}
+
+func writeJson(w http.ResponseWriter, js []map[string]interface{}) {
+    indented, _ := json.MarshalIndent(js, "", " ")
+
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(indented)
+}
+
+
+func limit(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if limiter.Allow() == false {
+            http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+            return
+        }
+
+        next.ServeHTTP(w, r)
+    })
 }
