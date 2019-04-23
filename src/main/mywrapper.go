@@ -108,7 +108,7 @@ func getLiveSeries() (error, []map[string]interface{}) {
     series := getKeyAndReturnArray(jn, "data")
 
     for _, serie := range series {
-        if serie["end"] == nil {
+        if serie["start"] != nil && serie["end"] == nil {
             log.Println("Id:", serie["id"], " starts", serie["start"])
             returnValue = append(returnValue, serie)
         }
