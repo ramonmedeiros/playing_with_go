@@ -9,8 +9,8 @@ import (
     "os"
     "github.com/gin-gonic/gin"
     "encoding/json"
-    "time"
     "log"
+    "github.com/aviddiviner/gin-limit"
 )
 
 const ABIOS_URL = "https://api.abiosgaming.com/v2"
@@ -18,16 +18,20 @@ const ABIOS_URL = "https://api.abiosgaming.com/v2"
 var atoken string
 
 func main() {
+    // parse client_id and key
     client_id := flag.String("id", "", "client id for Abios API")
     client_key := flag.String("key", "", "client key for Abios API")
     flag.Parse()
 
+    // start and set rate limit
 	server := gin.Default()
+    server.Use(limit.MaxAllowed(2))
 
+    // store token and let it global
     atoken = getAccessToken(*client_key, *client_id)
-
     log.Println("ACCESS_TOKEN:", atoken)
 
+    // routers
 	server.GET("/series/live", series)
 	server.GET("/players/live", players)
 	server.GET("/teams/live", teams)
@@ -85,9 +89,6 @@ func getAccessToken(clientToken string, clientId string) (string) {
 
 
 func getBody(url string) (int, []byte) {
-    limiter := time.Tick(500 * time.Millisecond)
-    <-limiter
-
     req, _ := http.NewRequest("GET", url + "?access_token=" + atoken, strings.NewReader(""))
 
 	res, _ := http.DefaultClient.Do(req)
@@ -109,7 +110,6 @@ func getLiveSeries() (error, []map[string]interface{}) {
 
     for _, serie := range series {
         if serie["start"] != nil && serie["end"] == nil {
-            log.Println("Id:", serie["id"], " starts", serie["start"])
             returnValue = append(returnValue, serie)
         }
     }
@@ -141,4 +141,3 @@ func getNestedKeyFromArray(array []map[string]interface{}, key1 string, key2 str
 
     return returnValue
 }
-
