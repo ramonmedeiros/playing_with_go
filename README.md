@@ -7,3 +7,5 @@ Small backend REST server, that wrap calls to abiosapi.
 ```
 $ CLIENT_ID=<id> KEY=<key> make
 ```
+
+HTTP will serve on http://localhost:8080
