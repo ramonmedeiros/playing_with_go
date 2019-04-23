@@ -15,7 +15,7 @@ import (
 const ABIOS_URL = "https://api.abiosgaming.com/v2"
 
 var atoken string
-var limiter = rate.NewLimiter(2, 5)
+var limiter = rate.NewLimiter(2, 2)
 
 func main() {
     // parse client_id and key
