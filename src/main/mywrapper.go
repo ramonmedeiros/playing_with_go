@@ -10,6 +10,7 @@ import (
     "github.com/gin-gonic/gin"
     "encoding/json"
     "time"
+    "log"
 )
 
 const ABIOS_URL = "https://api.abiosgaming.com/v2"
@@ -24,6 +25,8 @@ func main() {
 	server := gin.Default()
 
     atoken = getAccessToken(*client_key, *client_id)
+
+    log.Println("ACCESS_TOKEN:", atoken)
 
 	server.GET("/series/live", series)
 	server.GET("/players/live", players)
@@ -106,6 +109,7 @@ func getLiveSeries() (error, []map[string]interface{}) {
 
     for _, serie := range series {
         if serie["end"] == nil {
+            log.Println("Id:", serie["id"], " starts", serie["start"])
             returnValue = append(returnValue, serie)
         }
     }
